@@ -9,7 +9,7 @@ Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 
 // #define FORWARD 1
 // #define BACKWARD 2
-// #define BRAKE 3
+// #define BRAKE 3      // apparently doesnt work
 // #define RELEASE 4
 
 Adafruit_DCMotor *motorA = AFMS.getMotor(1); // Front left motor
