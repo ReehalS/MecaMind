@@ -2,7 +2,8 @@
 #include <Adafruit_MotorShield.h>
 #include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
-#include "PID.h"
+#include "Rotation_PID.h"
+#include "Direction_PID.h"
 
 // Motor shield setup
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
@@ -15,13 +16,27 @@ Adafruit_DCMotor *motorC = AFMS.getMotor(4);
 Adafruit_MPU6050 mpu;
 
 // PID variables
-double setpoint, input, output;
-double kp = 1.0, ki = 0.1, kd = 0.1;
-PID pid(kp, ki, kd);
+double setpoint = 0; // Target rotation angle
+double input = 0;    // Current rotation rate
+double rotationOutput; // Output from rotation PID
+
+// Rotation PID setup
+double kpRotation = 1.0, kiRotation = 0.1, kdRotation = 0.1;
+Rotation_PID RotationPID(kpRotation, kiRotation, kdRotation);
+
+// Direction PID variables
+double intendedDirection = 0; // Desired direction in degrees
+double actualDirection = 0;   // Actual direction in degrees
+double directionOutput = 0;   // Output from direction PID
+
+// Direction PID setup
+double kpDirection = 1, kiDirection = 0.01, kdDirection = 0.01;
+Direction_PID DirectionPID(kpDirection, kiDirection, kdDirection);
 
 void moveRobot(double direction, double speed, unsigned long duration);
-void adjustMotorSpeeds(double direction, double rotationOutput, double maxSpeed);
+void adjustMotorSpeeds(double direction, double rotationOutput, double maxSpeed, double directionOutput);
 void stopMotors();
+double calculateActualDirection(sensors_event_t &accel);
 
 void setup() {
     Serial.begin(115200);
@@ -43,15 +58,13 @@ void setup() {
     motorB->setSpeed(0);
     motorD->setSpeed(0);
     motorC->setSpeed(0);
-
-    setpoint = 0; // Maintain no rotation
 }
 
 void loop() {
     // Example call to move the robot
-    int speed = 150;
+    int speed = 175;
     int time = 4000;
-    int angle = 270;
+    int angle = 90; // Example direction in degrees
     Serial.print("Moving robot at angle ");
     Serial.print(angle);
     Serial.print(" degrees at speed ");
@@ -60,50 +73,64 @@ void loop() {
     Serial.print(time);
     Serial.println(" milliseconds.");
     moveRobot(angle, speed, time);
-    Serial.print("Done");
-    while (true);
-}
-
-void readIMU() {
-    sensors_event_t a, g, temp;
-    mpu.getEvent(&a, &g, &temp);
-
-    // Use gyroscope data for PID control
-    input = g.gyro.z;
+    Serial.println("Done");
+    while (true); // Prevents loop from repeating
 }
 
 void moveRobot(double direction, double speed, unsigned long duration) {
     unsigned long startTime = millis();
+    intendedDirection = direction; // Set the intended direction in degrees
 
     while (millis() - startTime < duration) {
-        readIMU();
-        
+        sensors_event_t accel, gyro, temp;
+        mpu.getEvent(&accel, &gyro, &temp);
+
+        // Use gyroscope data for rotation PID control
+        input = gyro.gyro.z;
+        rotationOutput = RotationPID.compute(setpoint, input);
+
+        // Calculate actual direction from accelerometer data
+        actualDirection = calculateActualDirection(accel);
+        double directionError = intendedDirection - actualDirection;
+        directionOutput = DirectionPID.compute(intendedDirection, actualDirection);
+
+        // Debugging output
         Serial.print("Input: ");
         Serial.print(input);
+        Serial.print(". Rotation Output: ");
+        Serial.print(rotationOutput);
+        Serial.print(". Actual Direction: ");
+        Serial.print(actualDirection);
+        Serial.print(". Direction Error: ");
+        Serial.print(directionError);
+        Serial.print(". Direction Output: ");
+        Serial.print(directionOutput);
 
-        output = pid.compute(setpoint, input);
-
-        Serial.print(". Output: ");
-        Serial.print(output);
-
-        // Adjust motor speeds based on PID output
-        adjustMotorSpeeds(direction, output, speed);
+        // Adjust motor speeds
+        adjustMotorSpeeds(direction, rotationOutput, speed, directionOutput);
 
         delay(10); // PID loop delay
     }
-    
     stopMotors();
 }
 
-void adjustMotorSpeeds(double direction, double rotationOutput, double maxSpeed) {
+double calculateActualDirection(sensors_event_t &accel) {
+    // Calculate the actual movement direction from accelerometer data
+    double x = accel.acceleration.x;
+    double y = accel.acceleration.y;
+    double angle = atan2(y, x) * 180.0 / PI;
+    return angle;
+}
+
+void adjustMotorSpeeds(double direction, double rotationOutput, double maxSpeed, double directionOutput) {
     // Convert direction from degrees to radians for calculation
     double directionRad = direction * PI / 180.0;
 
     // Calculate force components for each motor
-    double forceFL = maxSpeed * cos(directionRad + PI/4) - rotationOutput;
-    double forceBL = maxSpeed * cos(directionRad - PI/4) - rotationOutput;
-    double forceFR = maxSpeed * cos(directionRad - PI/4) + rotationOutput;
-    double forceBR = maxSpeed * cos(directionRad + PI/4) + rotationOutput;
+    double forceFL = maxSpeed * cos(directionRad + PI/4) - rotationOutput - directionOutput;
+    double forceBL = maxSpeed * cos(directionRad - PI/4) - rotationOutput - directionOutput;
+    double forceFR = maxSpeed * cos(directionRad - PI/4) + rotationOutput + directionOutput;
+    double forceBR = maxSpeed * cos(directionRad + PI/4) + rotationOutput + directionOutput;
 
     Serial.print(". Force FL: ");
     Serial.print(forceFL);

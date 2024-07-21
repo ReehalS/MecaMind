@@ -1,6 +1,9 @@
-class PID {
+#ifndef ROTATION_PID_H
+#define ROTATION_PID_H
+
+class Rotation_PID {
 public:
-  PID(double kp, double ki, double kd);
+  Rotation_PID(double kp, double ki, double kd);
   void setTunings(double kp, double ki, double kd);
   double compute(double setpoint, double input);
 
@@ -9,3 +12,5 @@ private:
   double lastError_, integral_;
   unsigned long lastTime_;
 };
+
+#endif 
