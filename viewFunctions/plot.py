@@ -14,6 +14,8 @@ def parse_log(file_path):
     pattern = re.compile(r"Input: ([-+]?\d*\.\d+|\d+). Output: ([-+]?\d*\.\d+|\d+). Force FL: ([-+]?\d*\.\d+|\d+), Force BL: ([-+]?\d*\.\d+|\d+), Force FR: ([-+]?\d*\.\d+|\d+), Force BR: ([-+]?\d*\.\d+|\d+)")
 
     with open(file_path, 'r') as file:
+        # Skip the first line
+        next(file)
         for line in file:
             if "Done" in line:
                 continue
@@ -71,14 +73,14 @@ def plot_data(input_data, output_data, force_fl, force_bl, force_fr, force_br):
     plt.legend()
 
     plt.subplot(5, 1, 5)
-    # add left forces and subtract sum of right forcess to get total force
+    # add left forces and subtract sum of right forces to get total force
     total_force = [(force_fl[i] + force_bl[i] - force_fr[i] - force_br[i])/2 for i in range(len(force_fl))]
     plt.plot(total_force, label='Total Force', color='blue') 
-    
     plt.xlabel('Time')
     plt.ylabel('Force')
     plt.title('Total Force')
     plt.legend()
+
     plt.tight_layout()
     plt.show()
 
