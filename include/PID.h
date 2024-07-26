@@ -1,9 +1,9 @@
-#ifndef ROTATION_PID_H
-#define ROTATION_PID_H
+#ifndef PID_H
+#define PID_H
 
-class Rotation_PID {
+class PID {
 public:
-  Rotation_PID(double kp, double ki, double kd);
+  PID(double kp, double ki, double kd);
   void setTunings(double kp, double ki, double kd);
   double compute(double setpoint, double input);
 

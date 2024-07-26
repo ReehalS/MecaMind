@@ -1,8 +1,5 @@
 import re
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import tkinter as tk
-from tkinter import ttk
 
 # Function to parse the log file
 def parse_log(file_path):
@@ -31,7 +28,6 @@ def parse_log(file_path):
     )
 
     with open(file_path, 'r') as file:
-        next(file)
         for line in file:
             match = pattern.match(line)
             if match:
@@ -131,39 +127,11 @@ def plot_data(x_accel, y_accel, x_vel, y_vel, rotation_input, rotation_output, d
     plt.legend()
 
     plt.tight_layout()
-    return fig
-
-# Function to create a fullscreen scrollable Tkinter window with Matplotlib
-def create_scrollable_window(fig):
-    root = tk.Tk()
-    root.title("Force Plots")
-
-    # Set the window to fullscreen
-    root.attributes('-fullscreen', True)
-    root.bind('<F11>', lambda event: root.attributes('-fullscreen', True))  # Bind F11 to toggle fullscreen
-    root.bind('<Escape>', lambda event: root.attributes('-fullscreen', False))  # Bind Escape to exit fullscreen
-
-    canvas = tk.Canvas(root)
-    scrollbar = ttk.Scrollbar(root, orient="vertical", command=canvas.yview)
-    scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-    canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-    canvas.configure(yscrollcommand=scrollbar.set)
-
-    plot_frame = ttk.Frame(canvas)
-    canvas.create_window((0, 0), window=plot_frame, anchor="nw")
-
-    # Embed the Matplotlib figure into the Tkinter window
-    canvas_figure = FigureCanvasTkAgg(fig, master=plot_frame)
-    canvas_figure.draw()
-    canvas_figure.get_tk_widget().pack(fill=tk.BOTH, expand=True)
-
-    plot_frame.update_idletasks()
-    canvas.config(scrollregion=canvas.bbox("all"))
-
-    root.mainloop()
+    plt.show()
 
 # Main script
 if __name__ == "__main__":
     log_file_path = 'C:/Users/sunny/OneDrive/Documents/GitHub/MecaMind/viewFunctions/log.txt'  # Path to log file
     data = parse_log(log_file_path)
+    print("here")
     plot_data(*data)

@@ -1,16 +1,16 @@
-#include "Rotation_PID.h"
+#include "PID.h"
 #include <Arduino.h> // Include this for millis()
 
-Rotation_PID::Rotation_PID(double kp, double ki, double kd)
+PID::PID(double kp, double ki, double kd)
   : kp_(kp), ki_(ki), kd_(kd), lastError_(0), integral_(0), lastTime_(0) {}
 
-void Rotation_PID::setTunings(double kp, double ki, double kd) {
+void PID::setTunings(double kp, double ki, double kd) {
   kp_ = kp;
   ki_ = ki;
   kd_ = kd;
 }
 
-double Rotation_PID::compute(double setpoint, double input) {
+double PID::compute(double setpoint, double input) {
   unsigned long now = millis();
   double timeChange = (double)(now - lastTime_) / 1000.0; // Convert to seconds
   
