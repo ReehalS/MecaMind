@@ -12,11 +12,11 @@ void PID::setTunings(double kp, double ki, double kd) {
 
 double PID::compute(double setpoint, double input) {
   unsigned long now = millis();
-  double timeChange = (double)(now - lastTime_);
+  double timeChange = (double)(now - lastTime_) / 1000.0; // Convert to seconds
   
   double error = setpoint - input;
   integral_ += error * timeChange;
-  double derivative = (error - lastError_) / timeChange;
+  double derivative = (error - lastError_) / (timeChange + 1e-6); // Add epsilon to avoid division by zero
 
   lastError_ = error;
   lastTime_ = now;

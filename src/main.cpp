@@ -15,9 +15,15 @@ Adafruit_DCMotor *motorC = AFMS.getMotor(4);
 Adafruit_MPU6050 mpu;
 
 // PID variables
-double setpoint, input, output;
-double kp = 1.0, ki = 0.1, kd = 0.1;
-PID pid(kp, ki, kd);
+double setpoint, z_rot_input, rot_output = 0;
+double x_velocity = 0, y_velocity = 0, dir_input, dir_output;
+double kp = 10.0, ki = 0.0, kd = 1.0;
+PID rot_pid(kp, ki, kd);
+
+double dirKp = 0.1, dirKi = 0.0, dirKd = 0.1;
+PID dir_pid(dirKp, dirKi, dirKd);
+
+unsigned long lastTime = 0;
 
 void moveRobot(double direction, double speed, unsigned long duration);
 void adjustMotorSpeeds(double direction, double rotationOutput, double maxSpeed);
@@ -45,13 +51,14 @@ void setup() {
     motorC->setSpeed(0);
 
     setpoint = 0; // Maintain no rotation
+    lastTime = millis();
 }
 
 void loop() {
     // Example call to move the robot
     int speed = 150;
     int time = 4000;
-    int angle = 270;
+    int angle = 90;
     Serial.print("Moving robot at angle ");
     Serial.print(angle);
     Serial.print(" degrees at speed ");
@@ -69,29 +76,85 @@ void readIMU() {
     mpu.getEvent(&a, &g, &temp);
 
     // Use gyroscope data for PID control
-    input = g.gyro.z;
+    z_rot_input = g.gyro.z;
+
+    unsigned long currentTime = millis();
+    double dt = (currentTime - lastTime) / 1000.0; // Time difference in seconds
+    lastTime = currentTime;
+
+    // Integrate acceleration to get velocity
+    x_velocity += a.acceleration.x * dt;
+    y_velocity += a.acceleration.y * dt;
+
+    Serial.print("X Acceleration: ");
+    Serial.print(a.acceleration.x);
+    Serial.print(", Y Acceleration: ");
+    Serial.print(a.acceleration.y);
+
+    Serial.print(". X Velocity: ");
+    Serial.print(x_velocity);
+    Serial.print(", Y Velocity: ");
+    Serial.print(y_velocity);
+
+    // Direction robot is actually moving in (90 degrees = left)
+    dir_input = atan2(y_velocity, x_velocity) * 180 / PI;
 }
 
 void moveRobot(double direction, double speed, unsigned long duration) {
     unsigned long startTime = millis();
+    double moveDirection = direction;
+
+    double directionRad = direction * PI / 180.0;
+
+    double initSpeedFL = speed * cos(directionRad + PI / 4);
+    double initSpeedBL = speed * cos(directionRad - PI / 4);
+    double initSpeedFR = speed * cos(directionRad - PI / 4);
+    double initSpeedBR = speed * cos(directionRad + PI / 4);
+
+    motorA->setSpeed(constrain(abs(initSpeedFL), 0, 255));
+    motorB->setSpeed(constrain(abs(initSpeedBL), 0, 255));
+    motorD->setSpeed(constrain(abs(initSpeedBR), 0, 255));
+    motorC->setSpeed(constrain(abs(initSpeedFR), 0, 255));
+
+    // Set motor directions based on speed signs
+    motorA->run(initSpeedFL >= 0 ? FORWARD : BACKWARD);
+    motorB->run(initSpeedBL >= 0 ? FORWARD : BACKWARD);
+    motorD->run(initSpeedBR >= 0 ? FORWARD : BACKWARD);
+    motorC->run(initSpeedFR >= 0 ? FORWARD : BACKWARD);
+
+    delay(200); // Initial movement delay
 
     while (millis() - startTime < duration) {
         readIMU();
-        
-        Serial.print("Input: ");
-        Serial.print(input);
 
-        output = pid.compute(setpoint, input);
+        Serial.print(". Rotation Input: ");
+        Serial.print(z_rot_input);
 
-        Serial.print(". Output: ");
-        Serial.print(output);
+        rot_output = rot_pid.compute(setpoint, z_rot_input);
+
+        Serial.print(". Rotation Output: ");
+        Serial.print(rot_output);
+
+        double direction_error = direction - dir_input;
+        dir_output = dir_pid.compute(0, direction_error); // Target is 0 error
+
+        moveDirection = direction - dir_output;
+
+        Serial.print(". Direction Input: ");
+        Serial.print(dir_input);
+
+        Serial.print(". Direction Output: ");
+        Serial.print(dir_output);
+
+        Serial.print(". Move Direction: ");
+        Serial.print(moveDirection);
 
         // Adjust motor speeds based on PID output
-        adjustMotorSpeeds(direction, output, speed);
+        adjustMotorSpeeds(moveDirection, rot_output, speed);
 
         delay(10); // PID loop delay
     }
-    
+
     stopMotors();
 }
 
@@ -100,10 +163,10 @@ void adjustMotorSpeeds(double direction, double rotationOutput, double maxSpeed)
     double directionRad = direction * PI / 180.0;
 
     // Calculate force components for each motor
-    double forceFL = maxSpeed * cos(directionRad + PI/4) - rotationOutput;
-    double forceBL = maxSpeed * cos(directionRad - PI/4) - rotationOutput;
-    double forceFR = maxSpeed * cos(directionRad - PI/4) + rotationOutput;
-    double forceBR = maxSpeed * cos(directionRad + PI/4) + rotationOutput;
+    double forceFL = maxSpeed * cos(directionRad + PI / 4) - rotationOutput;
+    double forceBL = maxSpeed * cos(directionRad - PI / 4) - rotationOutput;
+    double forceFR = maxSpeed * cos(directionRad - PI / 4) + rotationOutput;
+    double forceBR = maxSpeed * cos(directionRad + PI / 4) + rotationOutput;
 
     Serial.print(". Force FL: ");
     Serial.print(forceFL);
